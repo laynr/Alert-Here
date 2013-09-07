@@ -7,7 +7,15 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <MapKit/MapKit.h>
+#define METERS_PER_MILE 1609.344
 
-@interface ViewController : UIViewController
+@interface ViewController : UIViewController <MKMapViewDelegate> {
+	MKMapView *mapView;
+    
+}
+
+@property (nonatomic, retain) IBOutlet MKMapView *mapView;
+
 
 @end

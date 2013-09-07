@@ -7,8 +7,94 @@
 //
 
 #import "AppDelegate.h"
+#import <MapKit/MapKit.h>
+
 
 @implementation AppDelegate
+
+@synthesize title;
+@synthesize subtitle;
+@synthesize coords;
+@synthesize first;
+@synthesize manager;
+
+
+-(void) monitorOn
+{
+    
+    if(manager == nil)
+    {
+        manager = [[CLLocationManager alloc]init];
+    }
+    
+    
+    manager.delegate=self;
+    
+    CLRegion *region=[[CLRegion alloc] initCircularRegionWithCenter:coords
+                                                             radius:100
+                                                         identifier:@"alerthere"];
+    
+    
+    [manager startMonitoringForRegion:region desiredAccuracy:kCLLocationAccuracyBestForNavigation];
+    NSLog(@"monitoring %f %f", coords.latitude, coords.longitude);
+    
+    //[manager startMonitoringSignificantLocationChanges];
+}
+
+-(void) monitorOff
+{
+    if(manager == nil)
+    {
+        manager = [[CLLocationManager alloc]init];
+    }
+    
+    CLRegion *region=[[CLRegion alloc] initCircularRegionWithCenter:coords
+                                                             radius:100
+                                                         identifier:@"alerthere"];
+    
+    [manager stopMonitoringForRegion:region];
+}
+
+-(void) upDate
+{
+    NSLog(@"called update");
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *documentsDirectory = [paths objectAtIndex:0];
+    NSString *path = [documentsDirectory stringByAppendingPathComponent:@"alert.plist"];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+
+    NSMutableDictionary *data;
+    
+    if ([fileManager fileExistsAtPath: path])
+    {
+        data = [[NSMutableDictionary alloc] initWithContentsOfFile: path];
+    }
+    else
+    {
+        // If the file doesn’t exist, create an empty dictionary
+        data = [[NSMutableDictionary alloc] init];
+    }
+    
+    if (title == NULL)
+    {
+        title = @"Drag to Move";
+    }
+    subtitle = [NSString	stringWithFormat:@"%f %f", coords.latitude, coords.longitude];
+    
+    //To insert the data into the plist
+    [data setObject:title forKey:@"title"];
+    [data setObject:subtitle forKey:@"subtitle"];
+    [data setObject:[NSNumber numberWithDouble:coords.latitude] forKey:@"latitude"];
+    [data setObject:[NSNumber numberWithDouble:coords.longitude] forKey:@"longitude"];
+    [data writeToFile: path atomically:YES];
+    
+    NSLog(@"%@",data);
+    [data release];
+    
+    [self monitorOff];
+    [self monitorOn];
+
+}
 
 - (void)dealloc
 {
@@ -19,6 +105,31 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
     // Override point for customization after application launch.
+    NSString* documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) objectAtIndex:0];
+    NSString* path = [documentsPath stringByAppendingPathComponent:@"alert.plist"];
+    BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:path];
+    
+    if (fileExists==FALSE)
+    {
+        NSLog(@"no file");
+        coords = first;
+        //coords.latitude = 30;
+        //coords.longitude = 30;
+        title = @"Drag to Move Pin";
+        subtitle = [NSString	stringWithFormat:@"%f %f", coords.latitude, coords.longitude];
+        
+        
+        
+        NSMutableDictionary *data = [[NSMutableDictionary alloc] init];
+        [data setObject:title forKey:@"title"];
+        [data setObject:subtitle forKey:@"subtitle"];
+        [data setObject:[NSNumber numberWithDouble:coords.latitude] forKey:@"latitude"];
+        [data setObject:[NSNumber numberWithDouble:coords.longitude] forKey:@"longitude"];
+
+        NSLog(@"data %@", data);
+        [data writeToFile:path atomically:YES];
+        [data release];
+    }
     return YES;
 }
 							
@@ -47,6 +158,76 @@
 - (void)applicationWillTerminate:(UIApplication *)application
 {
     // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
+}
+
+- (void) locationManager:(CLLocationManager *)manager didEnterRegion:(CLRegion *)region
+{
+    
+    NSLog(@"didEnterRegion for %@",[region identifier]);
+        
+    UIApplicationState applicationState = [UIApplication sharedApplication].applicationState;
+    if (applicationState == UIApplicationStateActive)
+    {
+        UIAlertView *alr=[[UIAlertView alloc] initWithTitle:@"in Alert Area"//[alertText text]
+                                                    message:[region identifier]
+                                                   delegate:nil
+                                          cancelButtonTitle:nil
+                                          otherButtonTitles:@"Ok",nil];
+        
+        [alr show];
+        
+        [alr release];
+    }
+    
+    else
+    {
+    UILocalNotification *notification = [[UILocalNotification alloc] init];
+    notification.fireDate = [NSDate date];
+    NSTimeZone* timezone = [NSTimeZone defaultTimeZone];
+    notification.timeZone = timezone;
+    notification.alertBody = @"In Alert Area";
+    notification.alertAction = @"Show";
+    notification.soundName = UILocalNotificationDefaultSoundName;
+    [[UIApplication sharedApplication] scheduleLocalNotification:notification];
+    [notification release]; // release if not using ARC
+    }
+    
+    
+    
+    
+
+}
+
+- (void) locationManager:(CLLocationManager *)manager didExitRegion:(CLRegion *)region
+{
+    NSLog(@"didLeaveRegion for %@",[region identifier]);
+    
+    UIApplicationState applicationState = [UIApplication sharedApplication].applicationState;
+    if (applicationState == UIApplicationStateActive)
+    {
+        UIAlertView *alr=[[UIAlertView alloc] initWithTitle:@"Leaving Alert Area"//[alertText text]
+                                                    message:[region identifier]
+                                                   delegate:nil
+                                          cancelButtonTitle:nil
+                                          otherButtonTitles:@"Ok",nil];
+        
+        [alr show];
+        
+        [alr release];
+    }
+    
+    else
+    {
+        UILocalNotification *notification = [[UILocalNotification alloc] init];
+        notification.fireDate = [NSDate date];
+        NSTimeZone* timezone = [NSTimeZone defaultTimeZone];
+        notification.timeZone = timezone;
+        notification.alertBody = @"Leaving Alert Area";
+        notification.alertAction = @"Show";
+        notification.soundName = UILocalNotificationDefaultSoundName;
+        [[UIApplication sharedApplication] scheduleLocalNotification:notification];
+        [notification release]; // release if not using ARC
+    }
 }
 
 @end
